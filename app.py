@@ -1,10 +1,10 @@
 import streamlit as st
-import google.generativeai as genai
+from groq import Groq
 import json
 import time
 
-# Configure Gemini API
-genai.configure(api_key=st.secrets.get("GEMINI_API_KEY", ""))
+# Configure Groq API
+client = Groq(api_key=st.secrets.get("GROQ_API_KEY", ""))
 
 SCENARIOS = {
     1: "Create a REST API endpoint in Python that handles user authentication with JWT tokens and rate limiting.",
@@ -16,15 +16,29 @@ if 'leaderboard' not in st.session_state:
 
 def evaluate(prompt, scenario):
     try:
-        model = genai.GenerativeModel('gemini-1.5-flash')
-        code = model.generate_content(f"{scenario}\n\n{prompt}").text
-        judge = model.generate_content(f"Rate 0-100: {code[:500]}. Return JSON: {{'total': number, 'feedback': 'text'}}").text
+        # Generate code from prompt
+        code_response = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[{"role": "user", "content": f"{scenario}\n\n{prompt}"}],
+            temperature=0.7,
+            max_tokens=2000
+        )
+        code = code_response.choices[0].message.content
+        
+        # Judge the code
+        judge_response = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[{"role": "user", "content": f"Rate 0-100: {code[:500]}. Return JSON: {{'total': number, 'feedback': 'text'}}"}],
+            temperature=0.3,
+            max_tokens=200
+        )
+        judge = judge_response.choices[0].message.content
+        
         try:
             return json.loads(judge.strip().replace('```json', '').replace('```', '')), code
         except:
             return {"total": 50, "feedback": "Parse error"}, code
     except Exception as e:
-        # Fallback debugging
         return {"total": 0, "feedback": f"Error: {str(e)}"}, "Error generating code"
 
 st.title("🏆 Prompt Competition")

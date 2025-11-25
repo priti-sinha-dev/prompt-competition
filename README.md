@@ -3,12 +3,17 @@
 A simple, free, and instant-scoring prompt competition platform using Streamlit + Google Gemini.
 
 ## Features
-- ✅ **100% FREE** - Uses Gemini's free tier (1,500 requests/day)
-- ⚡ **Instant scoring** - 2-4 second response time
+- ✅ **100% FREE** - Uses Groq's free tier (30 req/min = 1,800/hour)
+- ⚡ **Ultra-fast scoring** - Under 1 second response time!
 - 🏆 **Live leaderboard** - Real-time rankings
 - 📊 **Handles 50+ users** easily
 
 ## Quick Setup
+
+### Get Free Groq API Key
+1. Go to https://console.groq.com
+2. Sign up (free)
+3. Create API key
 
 ### Run Locally
 ```bash
@@ -21,7 +26,7 @@ streamlit run app.py
 1. This repo is already set up for deployment
 2. Go to https://share.streamlit.io
 3. Connect your repo
-4. Add `GEMINI_API_KEY` in Secrets
+4. Add `GROQ_API_KEY` in Secrets
 5. Deploy! ✨
 
 ## Customize Scenarios
