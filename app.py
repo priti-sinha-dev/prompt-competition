@@ -3,7 +3,7 @@ from groq import Groq
 import json
 import time
 
-# Configure Groq API
+# Configure Groq API (faster and more reliable than Gemini)
 client = Groq(api_key=st.secrets.get("GROQ_API_KEY", ""))
 
 SCENARIOS = {
