@@ -15,7 +15,7 @@ if 'leaderboard' not in st.session_state:
     st.session_state.leaderboard = []
 
 def evaluate(prompt, scenario):
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    model = genai.GenerativeModel('gemini-1.5-flash-latest')
     code = model.generate_content(f"{scenario}\n\n{prompt}").text
     judge = model.generate_content(f"Rate 0-100: {code[:500]}. Return JSON: {{'total': number, 'feedback': 'text'}}").text
     try:
