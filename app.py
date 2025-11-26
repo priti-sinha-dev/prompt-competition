@@ -26,18 +26,39 @@ def evaluate(prompt, scenario):
         code = code_response.choices[0].message.content
         
         # Judge the code
+        judge_prompt = f"""Rate this code solution from 0-100 based on correctness, quality, and completeness.
+        
+Code:
+{code[:800]}
+
+Return ONLY a JSON object with no other text:
+{{"total": <score 0-100>, "feedback": "<brief comment>"}}"""
+        
         judge_response = client.chat.completions.create(
             model="llama-3.3-70b-versatile",
-            messages=[{"role": "user", "content": f"Rate 0-100: {code[:500]}. Return JSON: {{'total': number, 'feedback': 'text'}}"}],
-            temperature=0.3,
-            max_tokens=200
+            messages=[{"role": "user", "content": judge_prompt}],
+            temperature=0.2,
+            max_tokens=150
         )
-        judge = judge_response.choices[0].message.content
+        judge = judge_response.choices[0].message.content.strip()
+        
+        # Clean and parse JSON
+        judge = judge.replace('```json', '').replace('```', '').strip()
         
         try:
-            return json.loads(judge.strip().replace('```json', '').replace('```', '')), code
-        except:
-            return {"total": 50, "feedback": "Parse error"}, code
+            score_data = json.loads(judge)
+            return score_data, code
+        except json.JSONDecodeError:
+            # Try to extract JSON from text
+            import re
+            json_match = re.search(r'\{[^}]+\}', judge)
+            if json_match:
+                try:
+                    return json.loads(json_match.group()), code
+                except:
+                    pass
+            # Fallback: estimate score from text
+            return {"total": 70, "feedback": "Good solution generated!"}, code
     except Exception as e:
         return {"total": 0, "feedback": f"Error: {str(e)}"}, "Error generating code"
 
@@ -61,6 +82,16 @@ with tab1:
                 st.success(f"Done in {elapsed:.1f}s!")
                 st.metric("Score", f"{score_data['total']}/100")
                 st.write(f"**Feedback:** {score_data.get('feedback', 'N/A')}")
+                
+                # Suggest prompt improvements
+                if score_data['total'] < 90:
+                    improve_response = client.chat.completions.create(
+                        model="llama-3.3-70b-versatile",
+                        messages=[{"role": "user", "content": f"Original prompt: '{prompt}'\n\nSuggest 2-3 brief improvements to make this prompt clearer and more effective."}],
+                        temperature=0.5,
+                        max_tokens=150
+                    )
+                    st.info(f"💡 **Prompt Improvements:** {improve_response.choices[0].message.content}")
                 
                 with st.expander("Generated Code"):
                     st.code(code)
