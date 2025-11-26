@@ -2,6 +2,7 @@ import streamlit as st
 from groq import Groq
 import json
 import time
+import os
 
 # Configure Groq API (faster and more reliable than Gemini)
 client = Groq(api_key=st.secrets.get("GROQ_API_KEY", ""))
@@ -56,8 +57,28 @@ PROMPT_EXAMPLES = {
     }
 }
 
+# Leaderboard persistence
+LEADERBOARD_FILE = "leaderboard.json"
+
+def load_leaderboard():
+    """Load leaderboard from file"""
+    if os.path.exists(LEADERBOARD_FILE):
+        try:
+            with open(LEADERBOARD_FILE, 'r') as f:
+                return json.load(f)
+        except:
+            return []
+    return []
+
+def save_leaderboard(data):
+    """Save leaderboard to file, keeping top 100"""
+    sorted_data = sorted(data, key=lambda x: x['score'], reverse=True)[:100]
+    with open(LEADERBOARD_FILE, 'w') as f:
+        json.dump(sorted_data, f, indent=2)
+
+# Initialize leaderboard from file
 if 'leaderboard' not in st.session_state:
-    st.session_state.leaderboard = []
+    st.session_state.leaderboard = load_leaderboard()
 
 def evaluate(prompt, scenario):
     try:
@@ -80,8 +101,9 @@ Scenario: {scenario}
 Code:
 {code[:1000]}
 
-Return ONLY a valid JSON object, nothing else:
-{{"total": 85, "feedback": "Excellent solution with minor improvements"}}"""
+Analyze the code above and return ONLY a JSON object with YOUR actual evaluation.
+Do NOT return a fixed score. Evaluate based on the criteria.
+Format: {{"total": <your-score-0-to-100>, "feedback": "<your-evaluation>"}}"""
         
         judge_response = client.chat.completions.create(
             model="llama-3.3-70b-versatile",
@@ -168,10 +190,12 @@ with tab1:
                 with st.expander("Generated Code"):
                     st.code(code)
                 
+                # Add to leaderboard and save
                 st.session_state.leaderboard.append({
                     'name': name, 'scenario': scenario, 
                     'score': score_data['total']
                 })
+                save_leaderboard(st.session_state.leaderboard)
         else:
             st.error("Fill all fields!")
 
