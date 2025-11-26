@@ -80,7 +80,7 @@ def save_leaderboard(data):
 if 'leaderboard' not in st.session_state:
     st.session_state.leaderboard = load_leaderboard()
 
-def evaluate(prompt, scenario):
+def evaluate(prompt, scenario, scenario_num):
     try:
         # Step 1: Evaluate the PROMPT quality (60% of final score)
         prompt_judge = f"""Rate this user's prompt from 0-100 based on:
@@ -156,9 +156,15 @@ Return ONLY JSON: {{"code_score": 0-100, "code_feedback": "brief comment"}}"""
             code_score = int(match.group(1)) if match else 70
             code_feedback = "Code evaluated"
         
-        # Step 4: Combine scores (60% prompt quality + 40% code quality)
-        final_score = int(prompt_score * 0.6 + code_score * 0.4)
-        final_feedback = f"Prompt Quality: {prompt_score}/100 - {prompt_feedback} | Code Quality: {code_score}/100 - {code_feedback}"
+        # Step 4: Combine scores
+        # For Scenario 2 (Design), evaluate 100% on prompt quality
+        # For Scenarios 1 & 3 (Code), use 60% prompt + 40% code
+        if scenario_num == 2:
+            final_score = int(prompt_score)
+            final_feedback = f"Design Prompt Quality: {prompt_score}/100 - {prompt_feedback}"
+        else:
+            final_score = int(prompt_score * 0.6 + code_score * 0.4)
+            final_feedback = f"Prompt Quality: {prompt_score}/100 - {prompt_feedback} | Code Quality: {code_score}/100 - {code_feedback}"
         
         return {"total": final_score, "feedback": final_feedback}, code
     except Exception as e:
@@ -178,7 +184,7 @@ with tab1:
         if name and prompt:
             with st.spinner("Evaluating..."):
                 start = time.time()
-                score_data, code = evaluate(prompt, SCENARIOS[scenario])
+                score_data, code = evaluate(prompt, SCENARIOS[scenario], scenario)
                 elapsed = time.time() - start
                 
                 st.success(f"Done in {elapsed:.1f}s!")
