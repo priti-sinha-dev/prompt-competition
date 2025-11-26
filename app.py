@@ -164,7 +164,7 @@ Return ONLY JSON: {{"code_score": 0-100, "code_feedback": "brief comment"}}"""
     except Exception as e:
         return {"total": 0, "feedback": f"Error: {str(e)}"}, "Error generating code"
 
-st.title("🏆 Prompt Competition")
+st.title("🏆 Prompt-a-thon")
 
 tab1, tab2 = st.tabs(["Submit", "Leaderboard"])
 
