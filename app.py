@@ -82,7 +82,42 @@ if 'leaderboard' not in st.session_state:
 
 def evaluate(prompt, scenario):
     try:
-        # Generate code from prompt
+        # Step 1: Evaluate the PROMPT quality (60% of final score)
+        prompt_judge = f"""Rate this user's prompt from 0-100 based on:
+- Clarity (0-35): Is it clear and unambiguous?
+- Specificity (0-35): Does it specify requirements, constraints, data structures, edge cases?
+- Completeness (0-30): Does it cover all aspects needed?
+
+Scenario: {scenario}
+
+User's Prompt: "{prompt}"
+
+IMPORTANT: Penalize vague prompts like "Make a X", "Create a Y", "Build a Z".
+Reward specific prompts with detailed requirements, error handling, validation, test cases.
+
+Return ONLY JSON: {{"prompt_score": 0-100, "prompt_feedback": "brief comment"}}"""
+        
+        prompt_eval_response = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[{"role": "user", "content": prompt_judge}],
+            temperature=0.2,
+            max_tokens=150
+        )
+        prompt_eval_text = prompt_eval_response.choices[0].message.content.strip()
+        prompt_eval_text = prompt_eval_text.replace('```json', '').replace('```', '').strip()
+        
+        # Parse prompt evaluation
+        import re
+        try:
+            prompt_eval = json.loads(prompt_eval_text)
+            prompt_score = prompt_eval.get('prompt_score', 50)
+            prompt_feedback = prompt_eval.get('prompt_feedback', 'Evaluated')
+        except:
+            match = re.search(r'"prompt_score"\s*:\s*(\d+)', prompt_eval_text)
+            prompt_score = int(match.group(1)) if match else 50
+            prompt_feedback = "Prompt evaluated"
+        
+        # Step 2: Generate code from prompt
         code_response = client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=[{"role": "user", "content": f"{scenario}\n\n{prompt}"}],
@@ -91,47 +126,41 @@ def evaluate(prompt, scenario):
         )
         code = code_response.choices[0].message.content
         
-        # Judge the code with detailed criteria
-        judge_prompt = f"""Rate this code solution from 0-100 based on:
+        # Step 3: Judge the generated CODE quality (40% of final score)
+        code_judge_prompt = f"""Rate this generated code from 0-100 based on:
 - Correctness (0-40): Does it solve the problem correctly?
-- Quality (0-30): Clean, readable, well-structured code?
-- Completeness (0-30): All requirements met, error handling, edge cases?
+- Quality (0-30): Clean, readable, well-structured?
+- Completeness (0-30): Error handling, edge cases covered?
 
-Scenario: {scenario}
 Code:
 {code[:1000]}
 
-Analyze the code above and return ONLY a JSON object with YOUR actual evaluation.
-Do NOT return a fixed score. Evaluate based on the criteria.
-Format: {{"total": <your-score-0-to-100>, "feedback": "<your-evaluation>"}}"""
+Return ONLY JSON: {{"code_score": 0-100, "code_feedback": "brief comment"}}"""
         
-        judge_response = client.chat.completions.create(
+        code_eval_response = client.chat.completions.create(
             model="llama-3.3-70b-versatile",
-            messages=[{"role": "user", "content": judge_prompt}],
+            messages=[{"role": "user", "content": code_judge_prompt}],
             temperature=0.2,
-            max_tokens=200
+            max_tokens=150
         )
-        judge_text = judge_response.choices[0].message.content.strip()
+        code_eval_text = code_eval_response.choices[0].message.content.strip()
+        code_eval_text = code_eval_text.replace('```json', '').replace('```', '').strip()
         
-        # Try to parse JSON
-        import re
-        # Remove markdown code blocks
-        judge_text = judge_text.replace('```json', '').replace('```', '').strip()
-        
+        # Parse code evaluation
         try:
-            score_data = json.loads(judge_text)
-        except json.JSONDecodeError:
-            # Try to extract JSON with regex
-            json_match = re.search(r'\{[^}]*"total"\s*:\s*\d+[^}]*\}', judge_text)
-            if json_match:
-                score_data = json.loads(json_match.group())
-            else:
-                # Last resort: extract number and return
-                num_match = re.search(r'\d+', judge_text)
-                score = int(num_match.group()) if num_match else 70
-                score_data = {"total": min(score, 100), "feedback": "Good solution!"}
+            code_eval = json.loads(code_eval_text)
+            code_score = code_eval.get('code_score', 70)
+            code_feedback = code_eval.get('code_feedback', 'Code evaluated')
+        except:
+            match = re.search(r'"code_score"\s*:\s*(\d+)', code_eval_text)
+            code_score = int(match.group(1)) if match else 70
+            code_feedback = "Code evaluated"
         
-        return score_data, code
+        # Step 4: Combine scores (60% prompt quality + 40% code quality)
+        final_score = int(prompt_score * 0.6 + code_score * 0.4)
+        final_feedback = f"Prompt Quality: {prompt_score}/100 - {prompt_feedback} | Code Quality: {code_score}/100 - {code_feedback}"
+        
+        return {"total": final_score, "feedback": final_feedback}, code
     except Exception as e:
         return {"total": 0, "feedback": f"Error: {str(e)}"}, "Error generating code"
 
